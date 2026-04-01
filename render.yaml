@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: polymarket-tracker
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /health
+    envVars:
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: REPORT_EMAIL_TO
+        sync: false
+      - key: REPORT_EMAIL_FROM
+        sync: false
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: SCAN_INTERVAL_HOURS
+        value: "6"
+      - key: PYTHON_VERSION
+        value: "3.11.9"

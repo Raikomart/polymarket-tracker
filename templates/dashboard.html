@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polymarket Insider Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+        /* ── Reset & Base ─────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg:        #0d1117;
+            --surface:   #161b22;
+            --border:    #30363d;
+            --text:      #e6edf3;
+            --muted:     #8b949e;
+            --accent:    #58a6ff;
+            --green:     #3fb950;
+            --orange:    #d29922;
+            --red:       #f85149;
+            --radius:    8px;
+        }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                         Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.5;
+            padding: 0;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* ── Header ───────────────────────────────────── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header h1 span { font-size: 22px; }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .last-scan {
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .btn-refresh {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .btn-refresh:hover { opacity: 0.85; }
+        .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+        .spinner {
+            display: none;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Container ────────────────────────────────── */
+        .container { max-width: 1280px; margin: 0 auto; padding: 20px 24px; }
+
+        /* ── KPI Cards ────────────────────────────────── */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .kpi-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+        }
+        .kpi-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .kpi-label {
+            font-size: 12px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        /* ── Panels ───────────────────────────────────── */
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .panel-header h2 {
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .panel-body { padding: 0; }
+        .panel-body.padded { padding: 16px 20px; }
+
+        /* ── Tables ───────────────────────────────────── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        thead th {
+            text-align: left;
+            padding: 10px 14px;
+            color: var(--muted);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        thead th:hover { color: var(--text); }
+        tbody td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #21262d;
+            white-space: nowrap;
+        }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: rgba(88, 166, 255, 0.04); }
+
+        /* severity colors */
+        .sev-green  { color: var(--green); font-weight: 600; }
+        .sev-orange { color: var(--orange); font-weight: 600; }
+        .sev-red    { color: var(--red); font-weight: 600; }
+
+        /* ── Chart ────────────────────────────────────── */
+        .chart-wrap {
+            padding: 16px 20px 20px;
+            height: 280px;
+        }
+
+        /* ── Empty state ──────────────────────────────── */
+        .empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        /* ── Responsive ───────────────────────────────── */
+        @media (max-width: 768px) {
+            .header { flex-direction: column; gap: 10px; }
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+            .container { padding: 12px; }
+            table { font-size: 12px; }
+            tbody td, thead th { padding: 8px 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══ Header ═══════════════════════════════════════════ -->
+<div class="header">
+    <h1><span>🔍</span> Polymarket Insider Tracker</h1>
+    <div class="header-right">
+        <span class="last-scan" id="lastScan">Last scan: loading...</span>
+        <button class="btn-refresh" id="btnRefresh" onclick="manualRefresh()">
+            <span class="spinner" id="spinner"></span>
+            🔄 Refresh Now
+        </button>
+    </div>
+</div>
+
+<!-- ═══ Main Content ═════════════════════════════════════ -->
+<div class="container">
+
+    <!-- KPI Row -->
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <div class="kpi-value" id="kpiMarkets">0</div>
+            <div class="kpi-label">Markets Monitored</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" id="kpiAlerts">0</div>
+            <div class="kpi-label">Active Alerts (24h)</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" id="kpiCoordinated">0</div>
+            <div class="kpi-label">Coordinated Pairs</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-value" id="kpiScore">0</div>
+            <div class="kpi-label">Highest Score Today</div>
+        </div>
+    </div>
+
+    <!-- Alerts Table -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>⚠️ Alerts</h2>
+        </div>
+        <div class="panel-body">
+            <table id="alertsTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('alertsTable', 0)">Triggered At</th>
+                        <th onclick="sortTable('alertsTable', 1)">Market</th>
+                        <th onclick="sortTable('alertsTable', 2)">Outcome Bucket</th>
+                        <th onclick="sortTable('alertsTable', 3)">Signal Type</th>
+                        <th onclick="sortTable('alertsTable', 4)">Severity</th>
+                        <th onclick="sortTable('alertsTable', 5)">Wallets</th>
+                        <th onclick="sortTable('alertsTable', 6)">Score</th>
+                    </tr>
+                </thead>
+                <tbody id="alertsBody"></tbody>
+            </table>
+            <div class="empty" id="alertsEmpty" style="display:none;">No alerts recorded yet. Run a scan to detect activity.</div>
+        </div>
+    </div>
+
+    <!-- Top Wallets Table -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>👛 Top Wallets by Insider Score</h2>
+        </div>
+        <div class="panel-body">
+            <table id="walletsTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('walletsTable', 0)">Wallet Address</th>
+                        <th onclick="sortTable('walletsTable', 1)">Score</th>
+                        <th onclick="sortTable('walletsTable', 2)">Age (days)</th>
+                        <th onclick="sortTable('walletsTable', 3)">Markets Traded</th>
+                        <th onclick="sortTable('walletsTable', 4)">Concentration %</th>
+                        <th onclick="sortTable('walletsTable', 5)">Largest Bet</th>
+                        <th onclick="sortTable('walletsTable', 6)">Coordinated?</th>
+                    </tr>
+                </thead>
+                <tbody id="walletsBody"></tbody>
+            </table>
+            <div class="empty" id="walletsEmpty" style="display:none;">No wallet scores yet.</div>
+        </div>
+    </div>
+
+    <!-- Volume Spike Chart -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>📈 Trade Volume (48h) with Alert Overlay</h2>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="volumeChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Coordinated Wallet Network -->
+    <div class="panel">
+        <div class="panel-header">
+            <h2>🔗 Coordinated Wallet Pairs</h2>
+        </div>
+        <div class="panel-body">
+            <table id="coordTable">
+                <thead>
+                    <tr>
+                        <th>Wallet A</th>
+                        <th>Wallet B</th>
+                        <th>Shared Funder</th>
+                        <th>Market</th>
+                        <th>Detected</th>
+                    </tr>
+                </thead>
+                <tbody id="coordBody"></tbody>
+            </table>
+            <div class="empty" id="coordEmpty" style="display:none;">No coordinated pairs detected.</div>
+        </div>
+    </div>
+
+</div><!-- /container -->
+
+<script>
+// ── State ──────────────────────────────────────────────
+let volumeChart = null;
+
+// ── Data Loaders ───────────────────────────────────────
+async function loadKPIs() {
+    try {
+        const res = await fetch('/api/kpis');
+        const d = await res.json();
+        document.getElementById('kpiMarkets').textContent = d.markets_monitored || 0;
+        document.getElementById('kpiAlerts').textContent = d.active_alerts_24h || 0;
+        document.getElementById('kpiCoordinated').textContent = d.coordinated_pairs_24h || 0;
+        document.getElementById('kpiScore').textContent = d.highest_score_today || 0;
+        if (d.last_scan && d.last_scan.scan_timestamp) {
+            document.getElementById('lastScan').textContent =
+                'Last scan: ' + d.last_scan.scan_timestamp + ' UTC';
+        }
+    } catch(e) { console.error('KPI load error', e); }
+}
+
+async function loadAlerts() {
+    try {
+        const res = await fetch('/api/alerts');
+        const data = await res.json();
+        const tbody = document.getElementById('alertsBody');
+        const empty = document.getElementById('alertsEmpty');
+        tbody.innerHTML = '';
+        if (!data.length) { empty.style.display = 'block'; return; }
+        empty.style.display = 'none';
+        data.forEach(a => {
+            const score = a.score || 0;
+            const sevClass = score >= 75 ? 'sev-red' : score >= 50 ? 'sev-orange' : 'sev-green';
+            const ts = a.triggered_at || a.detected_at || '';
+            const wallets = (a.wallets_involved || []).map(w => w.substring(0,10) + '…').join(', ');
+            tbody.innerHTML += `<tr>
+                <td>${ts}</td>
+                <td>${(a.market_question || '').substring(0,55)}${(a.market_question||'').length > 55 ? '…' : ''}</td>
+                <td>${(a.outcome_token || '').substring(0,18)}…</td>
+                <td>${a.signal_type || ''}</td>
+                <td class="${sevClass}">${(a.severity || '').toUpperCase()}</td>
+                <td>${a.wallet_count || 0} (${wallets})</td>
+                <td class="${sevClass}">${score}</td>
+            </tr>`;
+        });
+    } catch(e) { console.error('Alerts load error', e); }
+}
+
+async function loadWallets() {
+    try {
+        const res = await fetch('/api/scores');
+        const data = await res.json();
+        const tbody = document.getElementById('walletsBody');
+        const empty = document.getElementById('walletsEmpty');
+        tbody.innerHTML = '';
+        if (!data.length) { empty.style.display = 'block'; return; }
+        empty.style.display = 'none';
+        data.forEach(w => {
+            const score = w.insider_score || 0;
+            const sevClass = score >= 75 ? 'sev-red' : score >= 50 ? 'sev-orange' : 'sev-green';
+            const addr = (w.wallet_address || '').substring(0,14) + '…';
+            const coordinated = score >= 80 ? '⚠️ Likely' : '—';
+            tbody.innerHTML += `<tr>
+                <td><a href="https://polygonscan.com/address/${w.wallet_address}" target="_blank">${addr}</a></td>
+                <td class="${sevClass}">${score}</td>
+                <td>${w.account_age_days || 0}</td>
+                <td>${w.unique_markets || 0}</td>
+                <td>${(w.concentration_pct || 0).toFixed(1)}%</td>
+                <td>$${(w.max_bet_usd || 0).toLocaleString()}</td>
+                <td>${coordinated}</td>
+            </tr>`;
+        });
+    } catch(e) { console.error('Wallets load error', e); }
+}
+
+async function loadVolume() {
+    try {
+        const res = await fetch('/api/volume');
+        const data = await res.json();
+        const volumes = data.volumes || [];
+        const alertTimes = data.alert_timestamps || [];
+
+        const labels = volumes.map(v => {
+            const d = new Date(v.hour_bucket);
+            return d.toLocaleString('en-GB', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+        });
+        const values = volumes.map(v => v.volume_usd || 0);
+
+        // Build alert overlay annotations
+        const annotations = {};
+        alertTimes.forEach((ts, i) => {
+            const d = new Date(ts);
+            const label = d.toLocaleString('en-GB', {hour:'2-digit',minute:'2-digit'});
+            const closestIdx = findClosestIndex(volumes.map(v => v.hour_bucket), ts);
+            if (closestIdx >= 0) {
+                annotations['alert' + i] = {
+                    type: 'line',
+                    xMin: closestIdx,
+                    xMax: closestIdx,
+                    borderColor: 'rgba(248, 81, 73, 0.6)',
+                    borderWidth: 2,
+                    borderDash: [4, 4],
+                    label: {
+                        display: true,
+                        content: '⚠️',
+                        position: 'start',
+                        font: { size: 10 }
+                    }
+                };
+            }
+        });
+
+        const ctx = document.getElementById('volumeChart').getContext('2d');
+        if (volumeChart) volumeChart.destroy();
+
+        volumeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Trade Volume (USD)',
+                    data: values,
+                    borderColor: '#58a6ff',
+                    backgroundColor: 'rgba(88, 166, 255, 0.08)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    legend: {
+                        labels: { color: '#8b949e', font: { size: 12 } }
+                    },
+                    annotation: { annotations: annotations }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#8b949e', font: { size: 10 }, maxRotation: 45 },
+                        grid: { color: '#21262d' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#8b949e',
+                            font: { size: 11 },
+                            callback: v => '$' + v.toLocaleString()
+                        },
+                        grid: { color: '#21262d' }
+                    }
+                }
+            }
+        });
+    } catch(e) { console.error('Volume load error', e); }
+}
+
+async function loadCoordinated() {
+    try {
+        const res = await fetch('/api/coordinated');
+        const data = await res.json();
+        const tbody = document.getElementById('coordBody');
+        const empty = document.getElementById('coordEmpty');
+        tbody.innerHTML = '';
+        if (!data.length) { empty.style.display = 'block'; return; }
+        empty.style.display = 'none';
+        data.forEach(c => {
+            tbody.innerHTML += `<tr>
+                <td><a href="https://polygonscan.com/address/${c.wallet_a}" target="_blank">${(c.wallet_a||'').substring(0,14)}…</a></td>
+                <td><a href="https://polygonscan.com/address/${c.wallet_b}" target="_blank">${(c.wallet_b||'').substring(0,14)}…</a></td>
+                <td>${(c.shared_funder||'').substring(0,14)}…</td>
+                <td>${(c.market_question||'').substring(0,50)}${(c.market_question||'').length>50?'…':''}</td>
+                <td>${c.detected_at || ''}</td>
+            </tr>`;
+        });
+    } catch(e) { console.error('Coordinated load error', e); }
+}
+
+// ── Helpers ────────────────────────────────────────────
+function findClosestIndex(hourBuckets, timestamp) {
+    const target = new Date(timestamp).getTime();
+    let closest = -1, minDiff = Infinity;
+    hourBuckets.forEach((hb, i) => {
+        const diff = Math.abs(new Date(hb).getTime() - target);
+        if (diff < minDiff) { minDiff = diff; closest = i; }
+    });
+    return closest;
+}
+
+function sortTable(tableId, colIdx) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.rows);
+    const dir = table.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+    table.dataset.sortDir = dir;
+
+    rows.sort((a, b) => {
+        let va = a.cells[colIdx].textContent.trim();
+        let vb = b.cells[colIdx].textContent.trim();
+        // Try numeric
+        const na = parseFloat(va.replace(/[$,%…]/g, ''));
+        const nb = parseFloat(vb.replace(/[$,%…]/g, ''));
+        if (!isNaN(na) && !isNaN(nb)) {
+            return dir === 'asc' ? na - nb : nb - na;
+        }
+        return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    });
+    rows.forEach(r => tbody.appendChild(r));
+}
+
+// ── Manual Refresh ─────────────────────────────────────
+async function manualRefresh() {
+    const btn = document.getElementById('btnRefresh');
+    const spinner = document.getElementById('spinner');
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+
+    try {
+        const res = await fetch('/api/refresh', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'started' || data.status === 'already_running') {
+            // Poll for completion
+            pollScanStatus();
+        } else {
+            btn.disabled = false;
+            spinner.style.display = 'none';
+        }
+    } catch(e) {
+        alert('Refresh failed: ' + e.message);
+        btn.disabled = false;
+        spinner.style.display = 'none';
+    }
+}
+
+function pollScanStatus() {
+    const btn = document.getElementById('btnRefresh');
+    const spinner = document.getElementById('spinner');
+    const interval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/scan-status');
+            const data = await res.json();
+            if (!data.running) {
+                clearInterval(interval);
+                btn.disabled = false;
+                spinner.style.display = 'none';
+                // Reload all dashboard data
+                await Promise.all([
+                    loadKPIs(), loadAlerts(), loadWallets(),
+                    loadVolume(), loadCoordinated()
+                ]);
+            }
+        } catch(e) {
+            clearInterval(interval);
+            btn.disabled = false;
+            spinner.style.display = 'none';
+        }
+    }, 3000); // poll every 3 seconds
+}
+
+// ── Init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    loadKPIs();
+    loadAlerts();
+    loadWallets();
+    loadVolume();
+    loadCoordinated();
+});
+</script>
+
+</body>
+</html>

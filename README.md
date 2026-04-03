@@ -139,7 +139,7 @@ Each wallet receives an **Insider Score** — a composite metric weighting frequ
 
 Interested in prediction market analytics, AI-driven signal detection, or building tools like this?
 
-**Let's connect on LinkedIn:** [Giorgio Tsoupis](https://www.linkedin.com/in/giorgiotsoupis/)
+**Let's connect on LinkedIn:** [Giorgio Tsoupis](https://www.linkedin.com/in/digital-transformation-sales-strategy/)
 
 I'm happy to discuss the methodology, potential collaborations, or custom implementations for your use case.
 

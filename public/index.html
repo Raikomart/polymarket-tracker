@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="A read-only live Polymarket wallet position tracker.">
+  <title>Polymarket Portfolio Tracker</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #0b1020;
+      --panel: #111a2d;
+      --panel-soft: #17233a;
+      --border: rgba(167, 190, 226, .13);
+      --text: #f3f6fc;
+      --muted: #91a0b9;
+      --blue: #84aaff;
+      --green: #64d9a0;
+      --red: #ff8188;
+      --amber: #f5c46a;
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 50% -25%, #1b2b4a 0, var(--page) 52%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+    button, input { font: inherit; }
+    .shell { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 38px 0 56px; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 48px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 700; letter-spacing: -.02em; }
+    .brand-icon { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--border); border-radius: 12px; background: linear-gradient(145deg, #25395d, #142039); color: #b7cdff; }
+    .read-only { border: 1px solid var(--border); border-radius: 99px; padding: 7px 11px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .read-only::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--green); vertical-align: 1px; }
+    .intro { max-width: 700px; margin-bottom: 30px; }
+    .eyebrow { color: var(--blue); font-size: 12px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { margin: 10px 0 12px; font-size: clamp(34px, 6vw, 56px); line-height: 1.05; letter-spacing: -.055em; }
+    .intro p { max-width: 590px; margin: 0; color: var(--muted); font-size: 16px; }
+    .search-card, .stat, .positions-card { border: 1px solid var(--border); border-radius: var(--radius); background: rgba(17, 26, 45, .88); box-shadow: 0 18px 55px rgba(0, 0, 0, .14); }
+    .search-card { padding: 20px; margin-bottom: 16px; }
+    .form-label { display: block; margin-bottom: 9px; color: #d3dded; font-size: 13px; font-weight: 650; }
+    .form-row { display: flex; gap: 10px; }
+    input { min-width: 0; flex: 1; padding: 13px 15px; border: 1px solid var(--border); border-radius: 11px; outline: none; background: #0b1324; color: var(--text); font-size: 14px; }
+    input::placeholder { color: #677792; }
+    input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(132, 170, 255, .13); }
+    .primary { min-width: 128px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 12px 17px; border: 0; border-radius: 11px; background: #8eafff; color: #0a1326; font-size: 14px; font-weight: 760; cursor: pointer; transition: background .15s, transform .15s; }
+    .primary:hover { background: #a7c0ff; transform: translateY(-1px); }
+    .primary:disabled { opacity: .65; cursor: wait; transform: none; }
+    .helper { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+    .notice { min-height: 22px; margin: 0 2px 15px; color: var(--muted); font-size: 13px; }
+    .notice.error { color: var(--red); }
+    .notice.success { color: var(--green); }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+    .stat { min-width: 0; padding: 17px 19px; }
+    .stat-label { color: var(--muted); font-size: 12px; }
+    .stat-value { overflow: hidden; margin-top: 7px; font-size: clamp(20px, 3vw, 27px); font-weight: 720; letter-spacing: -.035em; text-overflow: ellipsis; white-space: nowrap; }
+    .stat-value.positive, .positive { color: var(--green); }
+    .stat-value.negative, .negative { color: var(--red); }
+    .positions-card { overflow: hidden; }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+    h2 { margin: 0; font-size: 16px; letter-spacing: -.015em; }
+    .count { color: var(--muted); font-size: 12px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 12px 16px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
+    td { padding: 14px 16px; border-top: 1px solid rgba(167,190,226,.08); font-size: 13px; white-space: nowrap; }
+    tbody tr:hover { background: rgba(132,170,255,.035); }
+    .market-name { max-width: 360px; overflow: hidden; color: #e8eef9; font-weight: 620; text-overflow: ellipsis; }
+    .outcome { display: inline-flex; border: 1px solid var(--border); border-radius: 99px; padding: 3px 8px; color: #c8d5ea; font-size: 11px; }
+    .empty { padding: 50px 20px; color: var(--muted); text-align: center; }
+    .updated { color: var(--muted); font-size: 12px; }
+    .spin { width: 14px; height: 14px; border: 2px solid rgba(10,19,38,.3); border-top-color: #0a1326; border-radius: 50%; animation: rotate .7s linear infinite; }
+    @keyframes rotate { to { transform: rotate(360deg); } }
+    .footer { margin-top: 18px; color: #73819a; font-size: 12px; text-align: center; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 680px) {
+      .shell { width: min(100% - 24px, 1120px); padding-top: 22px; }
+      .topline { margin-bottom: 35px; }
+      .intro p { font-size: 14px; }
+      .search-card { padding: 15px; }
+      .form-row { flex-direction: column; }
+      .primary { width: 100%; min-height: 46px; }
+      .stats { grid-template-columns: 1fr; gap: 9px; }
+      .stat { padding: 13px 16px; }
+      .stat-value { margin-top: 3px; font-size: 22px; }
+      .section-heading { padding: 15px; }
+      th, td { padding-right: 12px; padding-left: 12px; }
+      .market-name { max-width: 230px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topline">
+      <div class="brand"><span class="brand-icon" aria-hidden="true">◈</span><span>POLYMARKET <span style="color:#91a0b9;font-weight:550">TRACKER</span></span></div>
+      <span class="read-only">Public data · Read only</span>
+    </header>
+
+    <section class="intro" aria-labelledby="page-title">
+      <div class="eyebrow">Portfolio overview</div>
+      <h1 id="page-title">Your positions,<br>in real time.</h1>
+      <p>View public Polymarket positions, live sell-side prices and profit or loss. No sign-in or wallet connection needed.</p>
+    </section>
+
+    <section class="search-card" aria-label="Look up a public wallet">
+      <label class="form-label" for="wallet">Public wallet address</label>
+      <div class="form-row">
+        <input id="wallet" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a public address, starting with 0x" aria-describedby="wallet-help">
+        <button id="refresh" class="primary" type="button"><span id="button-content">View portfolio</span></button>
+      </div>
+      <p class="helper" id="wallet-help">Only a public address is needed. Never enter a private key or recovery phrase.</p>
+    </section>
+
+    <p id="status" class="notice" role="status" aria-live="polite">Enter a public wallet address to get started.</p>
+
+    <section class="stats" aria-label="Portfolio summary">
+      <article class="stat"><div class="stat-label">Open positions</div><div class="stat-value" id="position-count">—</div></article>
+      <article class="stat"><div class="stat-label">Current value</div><div class="stat-value" id="portfolio-value">—</div></article>
+      <article class="stat"><div class="stat-label">Unrealized P/L</div><div class="stat-value" id="portfolio-pnl">—</div></article>
+    </section>
+
+    <section class="positions-card" aria-labelledby="positions-heading">
+      <div class="section-heading">
+        <h2 id="positions-heading">Positions</h2>
+        <span class="updated" id="last-updated">Last updated —</span>
+      </div>
+      <div class="table-wrap" id="table-wrap" hidden>
+        <table>
+          <thead><tr><th>Market</th><th>Outcome</th><th>Shares</th><th>Avg price</th><th>Live price</th><th>Value</th><th>Profit / loss</th><th>State</th></tr></thead>
+          <tbody id="positions-body"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="empty">Your positions will appear here after you look up an address.</div>
+    </section>
+    <footer class="footer">Prices are public market quotes and may move between refreshes. This tracker is informational, not financial advice.</footer>
+  </main>
+
+  <script>
+    const input = document.getElementById('wallet');
+    const refreshButton = document.getElementById('refresh');
+    const statusEl = document.getElementById('status');
+    const lastUpdatedEl = document.getElementById('last-updated');
+    const positionsBody = document.getElementById('positions-body');
+    const tableWrap = document.getElementById('table-wrap');
+    const emptyEl = document.getElementById('empty');
+    const refreshEveryMs = 15000;
+    let refreshTimer = null;
+    let requestInFlight = false;
+
+    const number = (value) => Number.isFinite(Number(value)) ? Number(value) : null;
+    const money = (value) => value === null ? '—' : new Intl.NumberFormat(undefined, {
+      style: 'currency', currency: 'USD', maximumFractionDigits: 2,
+    }).format(value);
+    const price = (value) => value === null ? '—' : Number(value).toFixed(3);
+
+    function setStatus(message, kind = '') {
+      statusEl.textContent = message;
+      statusEl.className = `notice ${kind}`.trim();
+    }
+
+    function setLoading(loading) {
+      refreshButton.disabled = loading;
+      refreshButton.innerHTML = loading
+        ? '<span class="spin" aria-hidden="true"></span><span>Loading…</span>'
+        : '<span>View portfolio</span>';
+    }
+
+    function addCell(row, value, className = '') {
+      const cell = document.createElement('td');
+      if (className) cell.className = className;
+      cell.textContent = value;
+      row.appendChild(cell);
+      return cell;
+    }
+
+    function renderPositions(positions) {
+      positionsBody.replaceChildren();
+      positions.forEach((position) => {
+        const row = document.createElement('tr');
+        addCell(row, position.title || 'Polymarket position', 'market-name');
+        const outcomeCell = addCell(row, '');
+        const outcome = document.createElement('span');
+        outcome.className = 'outcome';
+        outcome.textContent = position.outcome || '—';
+        outcomeCell.appendChild(outcome);
+        addCell(row, number(position.size)?.toLocaleString(undefined, { maximumFractionDigits: 4 }) ?? '—');
+        addCell(row, price(number(position.averagePrice)));
+        addCell(row, price(number(position.currentPrice)));
+        addCell(row, money(number(position.currentValue)));
+        const pnl = number(position.pnl);
+        addCell(row, money(pnl), pnl === null ? '' : pnl >= 0 ? 'positive' : 'negative');
+        addCell(row, position.status || 'Open');
+        positionsBody.appendChild(row);
+      });
+      tableWrap.hidden = positions.length === 0;
+      emptyEl.hidden = positions.length !== 0;
+      if (!positions.length) emptyEl.textContent = 'No open positions were found for this public address.';
+    }
+
+    function renderSummary(positions) {
+      const count = document.getElementById('position-count');
+      const value = document.getElementById('portfolio-value');
+      const pnl = document.getElementById('portfolio-pnl');
+      count.textContent = positions.length.toLocaleString();
+      const totalValue = positions.reduce((sum, item) => sum + (number(item.currentValue) || 0), 0);
+      const knownPnl = positions.filter((item) => number(item.pnl) !== null);
+      const totalPnl = knownPnl.reduce((sum, item) => sum + number(item.pnl), 0);
+      value.textContent = money(totalValue);
+      pnl.textContent = knownPnl.length ? money(totalPnl) : '—';
+      pnl.className = `stat-value ${totalPnl >= 0 ? 'positive' : 'negative'}`;
+    }
+
+    async function refreshWallet() {
+      const address = input.value.trim();
+      if (requestInFlight) return;
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        setStatus('Enter a valid public wallet address (0x followed by 40 hexadecimal characters).', 'error');
+        input.focus();
+        return;
+      }
+
+      requestInFlight = true;
+      setLoading(true);
+      setStatus('Fetching current positions and market prices…');
+      try {
+        const response = await fetch(`/.netlify/functions/polymarket?address=${encodeURIComponent(address)}`, {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+        });
+        let result;
+        try { result = await response.json(); }
+        catch { throw new Error('The server returned an unreadable response. Please try again.'); }
+        if (!response.ok) throw new Error(result.error || 'Could not load this wallet. Please try again.');
+
+        const positions = Array.isArray(result.positions) ? result.positions : [];
+        renderPositions(positions);
+        renderSummary(positions);
+        lastUpdatedEl.textContent = `Last updated ${new Date(result.lastUpdated).toLocaleTimeString()}`;
+        const truncatedMessage = result.truncated ? ' Showing the first 100 positions.' : '';
+        setStatus(positions.length
+          ? `Live public data loaded for ${address.slice(0, 6)}…${address.slice(-4)}. Refreshing every 15 seconds.${truncatedMessage}`
+          : `No open positions found for ${address.slice(0, 6)}…${address.slice(-4)}. Refreshing every 15 seconds.`, 'success');
+      } catch (error) {
+        setStatus(error.message || 'Could not load wallet data. Please try again.', 'error');
+      } finally {
+        requestInFlight = false;
+        setLoading(false);
+      }
+    }
+
+    function beginAutoRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = setInterval(() => {
+        if (input.value.trim()) refreshWallet();
+      }, refreshEveryMs);
+    }
+
+    refreshButton.addEventListener('click', () => {
+      refreshWallet();
+      beginAutoRefresh();
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        refreshWallet();
+        beginAutoRefresh();
+      }
+    });
+    input.addEventListener('input', () => {
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = null;
+    });
+  </script>
+</body>
+</html>
